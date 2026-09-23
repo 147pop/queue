@@ -11,6 +11,9 @@ PROJECT="queue"
 BASE_PORT=6080
 REGIONS_FILE="regions.txt"
 UAS_FILE="user-agents.txt"
+TARGET_URL="${TARGET_URL:-https://www.deportick.com}"
+OPEN_DELAY_MAX="${OPEN_DELAY_MAX:-30}"
+UA_VERSIONS="${UA_VERSIONS:-3}"
 
 usage() {
   cat <<EOF
@@ -27,14 +30,33 @@ Comandos:
 Config:
   .env             PIA_USER / PIA_PASS (copiar de .env.example)
   regions.txt      Pool de regiones PIA (una random por instancia, sin repetir)
-  user-agents.txt  Pool de user agents (uno random por instancia)
+  user-agents.txt  Plantillas de user agents ({V} = version de Chromium, uno distinto por instancia)
+
+Env opcionales:
+  TARGET_URL       URL a abrir tras el delay random (default: https://www.deportick.com)
+  OPEN_DELAY_MAX   Delay maximo en segundos antes de abrir TARGET_URL (default: 30)
+  UA_VERSIONS      Cuantas versiones mayores de Chrome usar hacia atras desde la real (default: 3)
 EOF
   exit 1
 }
 
-# Lee un archivo de pool ignorando comentarios y lineas vacias, mezclado random
-shuffled_pool() {
-  grep -v -e '^#' -e '^[[:space:]]*$' "$1" | awk -v seed="$RANDOM" 'BEGIN{srand(seed)}{print rand()"\t"$0}' | sort -n | cut -f2-
+# Lee un archivo de pool ignorando comentarios y lineas vacias
+read_pool() {
+  grep -v -e '^#' -e '^[[:space:]]*$' "$1"
+}
+
+# Mezcla random las lineas de stdin
+shuffle() {
+  awk -v seed="$RANDOM" 'BEGIN{srand(seed)}{print rand()"\t"$0}' | sort -n | cut -f2-
+}
+
+# Expande las plantillas {V} con la version mayor real de Chromium de la imagen
+# y las UA_VERSIONS-1 anteriores, sin duplicados
+ua_pool() {
+  local major
+  major=$(docker run --rm --entrypoint chromium "$IMAGE" --version | sed -n 's/^Chromium \([0-9]*\)\..*/\1/p')
+  [ -n "$major" ] || { echo "ERROR: no pude detectar la version de Chromium de $IMAGE" >&2; exit 1; }
+  read_pool "$UAS_FILE" | awk -v m="$major" -v n="$UA_VERSIONS" '{for(i=0;i<n;i++){l=$0; gsub(/\{V\}/, m-i, l); print l}}' | sort -u
 }
 
 generate_compose() {
@@ -42,11 +64,14 @@ generate_compose() {
   [ -f .env ] || { echo "ERROR: falta .env (copia .env.example y pone tus credenciales PIA)"; exit 1; }
 
   REGIONS=()
-  while IFS= read -r line; do REGIONS+=("$line"); done < <(shuffled_pool "$REGIONS_FILE")
+  while IFS= read -r line; do REGIONS+=("$line"); done < <(read_pool "$REGIONS_FILE" | shuffle)
+  local uas
+  uas=$(ua_pool)
   UAS=()
-  while IFS= read -r line; do UAS+=("$line"); done < <(shuffled_pool "$UAS_FILE")
+  while IFS= read -r line; do UAS+=("$line"); done < <(echo "$uas" | shuffle)
   local nr=${#REGIONS[@]} nu=${#UAS[@]}
   [ "$nr" -gt 0 ] && [ "$nu" -gt 0 ] || { echo "ERROR: pools vacios"; exit 1; }
+  [ "$n" -le "$nu" ] || { echo "ERROR: pediste $n instancias pero solo hay $nu user agents distintos (subi UA_VERSIONS o agrega plantillas a $UAS_FILE)"; exit 1; }
 
   {
     echo "# Generado por queue.sh - no editar a mano"
@@ -83,6 +108,8 @@ generate_compose() {
       - USER_AGENT=$ua
       - SCREEN_W=1280
       - SCREEN_H=800
+      - TARGET_URL=$TARGET_URL
+      - OPEN_DELAY_MAX=$OPEN_DELAY_MAX
     shm_size: "512m"
     mem_limit: 1200m
     restart: unless-stopped

@@ -5,6 +5,8 @@ set -e
 : "${SCREEN_H:=800}"
 : "${START_URL:=https://ipinfo.io/json}"
 : "${USER_AGENT:=}"
+: "${TARGET_URL:=https://www.deportick.com}"
+: "${OPEN_DELAY_MAX:=30}"
 
 export DISPLAY=:0
 
@@ -20,6 +22,19 @@ websockify --web /usr/share/novnc 6080 localhost:5900 &
 
 UA_FLAG=""
 [ -n "$USER_AGENT" ] && UA_FLAG="--user-agent=$USER_AGENT"
+
+if [ -n "$TARGET_URL" ]; then
+  (
+    for _ in $(seq 1 300); do
+      [ -L "$HOME/.config/chromium/SingletonLock" ] && break
+      sleep 0.1
+    done
+    delay=$(( $(od -An -N2 -tu2 /dev/urandom | tr -d ' ') % (OPEN_DELAY_MAX + 1) ))
+    echo "Abriendo $TARGET_URL en ${delay}s"
+    sleep "$delay"
+    chromium --no-sandbox ${UA_FLAG:+"$UA_FLAG"} "$TARGET_URL"
+  ) &
+fi
 
 exec chromium \
   --no-sandbox \
