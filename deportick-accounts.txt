@@ -1,0 +1,10 @@
+# Pool de cuentas de Deportick, una por linea, formato email:password
+# Cada instancia recibe una cuenta distinta y sin repetir. Si pedis mas
+# instancias que cuentas hay en el pool, queue.sh corta con error.
+# Si tu password tiene ":" o espacios, esta bien igual: se parte solo por el
+# primer ":" de la linea.
+usuario1@example.com:password1
+usuario2@example.com:password2
+usuario3@example.com:password3
+usuario4@example.com:password4
+usuario5@example.com:password5

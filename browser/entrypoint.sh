@@ -7,8 +7,12 @@ set -e
 : "${USER_AGENT:=}"
 : "${TARGET_URL:=https://www.deportick.com}"
 : "${OPEN_DELAY_MAX:=30}"
+: "${DEPORTICK_USER:=}"
+: "${DEPORTICK_PASS:=}"
 
 export DISPLAY=:0
+export CDP_PORT=9222
+PROFILE_DIR="$HOME/profile"
 
 Xvfb :0 -screen 0 "${SCREEN_W}x${SCREEN_H}x24" -nolisten tcp &
 
@@ -24,20 +28,26 @@ UA_FLAG=""
 [ -n "$USER_AGENT" ] && UA_FLAG="--user-agent=$USER_AGENT"
 
 if [ -n "$TARGET_URL" ]; then
+  node /monitor.mjs &
   (
     for _ in $(seq 1 300); do
-      [ -L "$HOME/.config/chromium/SingletonLock" ] && break
+      [ -L "$PROFILE_DIR/SingletonLock" ] && break
       sleep 0.1
     done
     delay=$(( $(od -An -N2 -tu2 /dev/urandom | tr -d ' ') % (OPEN_DELAY_MAX + 1) ))
     echo "Abriendo $TARGET_URL en ${delay}s"
     sleep "$delay"
-    chromium --no-sandbox ${UA_FLAG:+"$UA_FLAG"} "$TARGET_URL"
+    chromium --no-sandbox --user-data-dir="$PROFILE_DIR" ${UA_FLAG:+"$UA_FLAG"} "$TARGET_URL"
+    if [ -n "$DEPORTICK_USER" ] && [ -n "$DEPORTICK_PASS" ]; then
+      node /login.mjs
+    fi
   ) &
 fi
 
 exec chromium \
   --no-sandbox \
+  --user-data-dir="$PROFILE_DIR" \
+  --remote-debugging-port="$CDP_PORT" \
   --disable-dev-shm-usage \
   --disable-gpu \
   --no-first-run \

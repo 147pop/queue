@@ -10,10 +10,13 @@ RUN apk add --no-cache \
     font-noto-emoji \
     ca-certificates \
     tini \
+    nodejs \
     && ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html \
     && adduser -D -h /home/chrome chrome
 
 COPY entrypoint.sh /entrypoint.sh
+COPY login.mjs /login.mjs
+COPY monitor.mjs /monitor.mjs
 RUN chmod +x /entrypoint.sh
 
 USER chrome

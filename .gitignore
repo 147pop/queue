@@ -1,2 +1,4 @@
 .env
 docker-compose.yml
+.watch.pid
+watch.log
