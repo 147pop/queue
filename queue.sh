@@ -45,7 +45,7 @@ Env opcionales:
   OPEN_DELAY_MAX   Delay maximo en segundos antes de abrir TARGET_URL (default: 30)
   VPN_COUNTRIES    Paises (codigo ISO) de donde salen las IPs, se sortea pais y despues servidor (default: US AR UY CL BR)
   UA_VERSIONS      Cuantas versiones mayores de Chrome usar hacia atras desde la real (default: 3)
-  DEPLOY_INTERVAL  Segundos entre el arranque de cada instancia en up (default: 120)
+  DEPLOY_INTERVAL  Segundos entre el arranque de cada instancia en up (default: 100)
   VPN_WAIT         Segundos maximos esperando que cada VPN quede healthy en up (default: 120)
   ROTATE_MIN       Espera minima tras un 403 antes de reintentar con IP+UA nueva (default: 15)
   ROTATE_MAX       Espera maxima tras un 403 antes de reintentar con IP+UA nueva (default: 40)
@@ -334,7 +334,7 @@ case "${1:-}" in
           sleep "$wait_s"
         fi
       fi
-      next_at=$(( SECONDS + ${DEPLOY_INTERVAL:-120} ))
+      next_at=$(( SECONDS + ${DEPLOY_INTERVAL:-100} ))
       echo "$(date +%H:%M:%S) conectando vpn$i ($(sed -n "s/^  vpn$i: # //p" "$COMPOSE_FILE"))..."
       docker compose -f "$COMPOSE_FILE" up -d "vpn$i" 2>/dev/null
       deadline=$(( SECONDS + ${VPN_WAIT:-120} ))
